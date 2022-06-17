@@ -59,11 +59,23 @@ function ai1wm_backup_path( $params ) {
 	}
 
 	// Validate archive path
-	if ( validate_file( $params['archive'] ) !== 0 ) {
+	if ( ai1wm_validate_file( $params['archive'] ) !== 0 ) {
 		throw new Ai1wm_Archive_Exception( __( 'Invalid archive path. <a href="https://help.servmask.com/knowledgebase/invalid-archive-path/" target="_blank">Technical details</a>', AI1WM_PLUGIN_NAME ) );
 	}
 
 	return AI1WM_BACKUPS_PATH . DIRECTORY_SEPARATOR . $params['archive'];
+}
+
+/**
+ * Validates a file name and path against an allowed set of rules
+ *
+ * @param  string  $file          File path
+ * @param  array   $allowed_files Array of allowed files
+ * @return integer
+ */
+function ai1wm_validate_file( $file, $allowed_files = array() ) {
+	$file = str_replace( '\\', '/', $file );
+	return validate_file( $file, $allowed_files );
 }
 
 /**
@@ -78,7 +90,7 @@ function ai1wm_archive_path( $params ) {
 	}
 
 	// Validate archive path
-	if ( validate_file( $params['archive'] ) !== 0 ) {
+	if ( ai1wm_validate_file( $params['archive'] ) !== 0 ) {
 		throw new Ai1wm_Archive_Exception( __( 'Invalid archive path. <a href="https://help.servmask.com/knowledgebase/invalid-archive-path/" target="_blank">Technical details</a>', AI1WM_PLUGIN_NAME ) );
 	}
 
@@ -148,6 +160,56 @@ function ai1wm_themes_list_path( $params ) {
  */
 function ai1wm_tables_list_path( $params ) {
 	return ai1wm_storage_path( $params ) . DIRECTORY_SEPARATOR . AI1WM_TABLES_LIST_NAME;
+}
+
+/**
+ * Get incremental.content.list absolute path
+ *
+ * @param  array  $params Request parameters
+ * @return string
+ */
+function ai1wm_incremental_content_list_path( $params ) {
+	return ai1wm_storage_path( $params ) . DIRECTORY_SEPARATOR . AI1WM_INCREMENTAL_CONTENT_LIST_NAME;
+}
+
+/**
+ * Get incremental.media.list absolute path
+ *
+ * @param  array  $params Request parameters
+ * @return string
+ */
+function ai1wm_incremental_media_list_path( $params ) {
+	return ai1wm_storage_path( $params ) . DIRECTORY_SEPARATOR . AI1WM_INCREMENTAL_MEDIA_LIST_NAME;
+}
+
+/**
+ * Get incremental.plugins.list absolute path
+ *
+ * @param  array  $params Request parameters
+ * @return string
+ */
+function ai1wm_incremental_plugins_list_path( $params ) {
+	return ai1wm_storage_path( $params ) . DIRECTORY_SEPARATOR . AI1WM_INCREMENTAL_PLUGINS_LIST_NAME;
+}
+
+/**
+ * Get incremental.themes.list absolute path
+ *
+ * @param  array  $params Request parameters
+ * @return string
+ */
+function ai1wm_incremental_themes_list_path( $params ) {
+	return ai1wm_storage_path( $params ) . DIRECTORY_SEPARATOR . AI1WM_INCREMENTAL_THEMES_LIST_NAME;
+}
+
+/**
+ * Get incremental.backups.list absolute path
+ *
+ * @param  array  $params Request parameters
+ * @return string
+ */
+function ai1wm_incremental_backups_list_path( $params ) {
+	return ai1wm_storage_path( $params ) . DIRECTORY_SEPARATOR . AI1WM_INCREMENTAL_BACKUPS_LIST_NAME;
 }
 
 /**
@@ -247,6 +309,16 @@ function ai1wm_backup_url( $params ) {
  */
 function ai1wm_archive_bytes( $params ) {
 	return filesize( ai1wm_archive_path( $params ) );
+}
+
+/**
+ * Get archive modified time in seconds
+ *
+ * @param  array   $params Request parameters
+ * @return integer
+ */
+function ai1wm_archive_mtime( $params ) {
+	return filemtime( ai1wm_archive_path( $params ) );
 }
 
 /**
@@ -1343,6 +1415,8 @@ function ai1wm_write( $handle, $content ) {
 		if ( ( $meta = stream_get_meta_data( $handle ) ) ) {
 			throw new Ai1wm_Not_Writable_Exception( sprintf( __( 'Unable to write to: %s. <a href="https://help.servmask.com/knowledgebase/invalid-file-permissions/" target="_blank">Technical details</a>', AI1WM_PLUGIN_NAME ), $meta['uri'] ) );
 		}
+	} elseif ( null === $write_result ) {
+		return strlen( $content );
 	} elseif ( strlen( $content ) !== $write_result ) {
 		if ( ( $meta = stream_get_meta_data( $handle ) ) ) {
 			throw new Ai1wm_Quota_Exceeded_Exception( sprintf( __( 'Out of disk space. Unable to write to: %s. <a href="https://help.servmask.com/knowledgebase/out-of-disk-space/" target="_blank">Technical details</a>', AI1WM_PLUGIN_NAME ), $meta['uri'] ) );
@@ -1361,14 +1435,18 @@ function ai1wm_write( $handle, $content ) {
  * @throws Ai1wm_Not_Readable_Exception
  */
 function ai1wm_read( $handle, $length ) {
-	$read_result = @fread( $handle, $length );
-	if ( false === $read_result ) {
-		if ( ( $meta = stream_get_meta_data( $handle ) ) ) {
-			throw new Ai1wm_Not_Readable_Exception( sprintf( __( 'Unable to read file: %s. <a href="https://help.servmask.com/knowledgebase/invalid-file-permissions/" target="_blank">Technical details</a>', AI1WM_PLUGIN_NAME ), $meta['uri'] ) );
+	if ( $length > 0 ) {
+		$read_result = @fread( $handle, $length );
+		if ( false === $read_result ) {
+			if ( ( $meta = stream_get_meta_data( $handle ) ) ) {
+				throw new Ai1wm_Not_Readable_Exception( sprintf( __( 'Unable to read file: %s. <a href="https://help.servmask.com/knowledgebase/invalid-file-permissions/" target="_blank">Technical details</a>', AI1WM_PLUGIN_NAME ), $meta['uri'] ) );
+			}
 		}
+
+		return $read_result;
 	}
 
-	return $read_result;
+	return false;
 }
 
 /**
